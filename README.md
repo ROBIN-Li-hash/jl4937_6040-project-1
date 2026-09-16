@@ -1,39 +1,46 @@
-# jl4937_6040-project-1
-jl4937_6040 project 1
-# ANSC 4040 Machine Learning Project  
-## Missing Data Prediction in Dairy Cow Milking Records
+# ANSC 4040 Mini Project
+## Machine Learning-Based Missing Value Prediction in Dairy Cow Data
 
-## 1. Project Overview
+## Project Objective
 
-This project aims to apply machine learning techniques to predict and fill in missing values in a dairy cow dataset.
+The objective of this project is to use machine learning techniques to predict and impute missing values in a dairy cow dataset based on information available from the existing features.
 
-The dataset contains information related to individual animals, lactation status, reproductive status, and milking performance. The main objective is to use the existing observed variables as predictors and train machine learning models to estimate the values of fields that are missing or intentionally removed.
+The dataset contains animal-level and milking-related variables, including lactation number, days in milk, reproductive status, milk flow, milk yield, and milking duration.
 
-Rather than simply replacing missing values using basic statistical methods such as the mean or median, this project explores whether machine learning can capture relationships among biological and production-related variables and provide more accurate predictions.
+Rather than relying only on simple imputation methods such as mean or median replacement, this project will investigate whether machine learning models can learn relationships among the existing variables and provide more accurate estimates for missing observations.
 
 ---
 
-## 2. Project Objective
+# Project Plan
+## 1. Timeline
 
-The main goal of this project is to:
+| Week | Plan |
+| --- | --- |
+| **Week 1** | Explore the dataset and identify the missing values |
+| **Week 2** | Clean the data and prepare variables for machine learning |
+| **Week 3** | Try several machine learning models and compare their performance |
+| **Week 4** | Select a model, predict the missing values, organize the code, and complete the README |
 
-> **Predict and fill in missing fields in the dataset based on the existing available information using machine learning techniques.**
+## 2. Development Environment
 
-The general workflow includes:
+The project will be developed **locally** on my personal computer.
 
-1. Importing and inspecting the dataset.
-2. Identifying missing values.
-3. Exploring relationships among variables.
-4. Preprocessing numerical and categorical variables.
-5. Dividing available observations into training and testing datasets.
-6. Training machine learning models using the existing fields as predictors.
-7. Evaluating model performance.
-8. Using the selected model to predict the missing values.
-9. Filling the predicted values back into the dataset.
+The primary development environment will be:
+
+- **IDE:** Visual Studio Code
+- **Programming Language:** Python
+- **Notebook Environment:** Jupyter Notebook in VS Code
+- **Version Control:** Git
+- **Repository Hosting:** GitHub
+- **Main Libraries:** pandas, NumPy, scikit-learn, Matplotlib
+
+The raw dataset will remain stored locally and will not be uploaded to GitHub. It will be excluded from version control using `.gitignore`.
+
+GitHub will be used to track changes in the code, project development, model testing, and documentation.
 
 ---
 
-## 3. Dataset Description
+## 3. Naming Convention
 
 The dataset contains dairy cow production and milking information.
 
@@ -59,30 +66,19 @@ These variables can potentially provide useful information for predicting missin
 
 ---
 
-## 4. Machine Learning Approach
 
-The project treats missing-value estimation as a supervised machine learning problem.
+### File Naming
 
-For a variable containing missing observations:
+Project files will use descriptive names without unnecessary spaces.
 
-- Rows where the target variable is available are used for model training and evaluation.
-- Other available variables are used as predictor features (`X`).
-- The variable containing missing values is treated as the prediction target (`y`).
-- After evaluating the model, the trained model is applied to rows where the target value is missing.
+Jupyter Notebook files will follow a numbered workflow so that the analysis can be read in the correct order.
 
-Conceptually:
+Planned notebook names:
 
 ```text
-Existing Variables
-       ↓
-Data Preprocessing
-       ↓
-Train / Test Split
-       ↓
-Machine Learning Model
-       ↓
-Model Evaluation
-       ↓
-Prediction of Missing Values
-       ↓
-Completed Dataset
+01_data_import.ipynb
+02_exploratory_data_analysis.ipynb
+03_data_preprocessing.ipynb
+04_model_training.ipynb
+05_model_evaluation.ipynb
+06_missing_value_prediction.ipynb
