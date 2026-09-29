@@ -19,7 +19,7 @@ This is treated as a **supervised multiclass classification problem**. Records w
 | --- | --- |
 | **Week 1** | Explore the dataset, identify duplicated records, quantify missing values, and inspect zero or implausible production values |
 | **Week 2** | Clean the data, remove invalid observations, define plausible biological/production ranges, and prepare labelled and unlabelled datasets |
-| **Week 3** | Encode categorical/date variables, create the train/test split, establish a baseline model, and train several classification models |
+| **Week 3** | Encode categorical/date variables, sort the data chronologically by `EventDate`, create the train/validation/test split, establish a baseline model, and train several classification models |
 | **Week 4** | Compare model performance, select the most appropriate model, predict missing `AnimalId` values, organize the code, and finalize the README |
 
 ---
@@ -135,43 +135,61 @@ Before model training, predictors will be converted into a machine-learning-read
 Planned preprocessing includes:
 
 - Convert `EventDate` to a proper datetime variable.
+- Sort the data chronologically by `EventDate`.
 - Extract potentially useful date components such as year, month, day, or day of year when appropriate.
 - Encode categorical variables such as `ReproductionStatus` and `milking`.
 - Keep the numerical milking variables as numeric predictors.
-- Ensure the same preprocessing steps are applied to the training set, test set, and final missing-`AnimalId` dataset.
+- Ensure the same preprocessing steps are applied to the training, validation, test, and final missing-`AnimalId` datasets.
 - Use a scikit-learn preprocessing pipeline where possible to reduce data leakage and keep preprocessing reproducible.
 
 ---
 
-## 5. Train/Test Split Strategy
+## 5. Train/Validation/Test Split Strategy
 
-The cleaned records with a known `AnimalId` will be divided into training and testing datasets.
+The cleaned records with a known `AnimalId` will be divided into training, validation, and testing datasets.
 
-The current notebook uses an **80/20 split**:
+Because the dataset contains repeated milking records collected over time, the records are first sorted chronologically by `EventDate`. The split is performed according to time order rather than randomly in order to reduce the risk of data leakage between earlier and later observations.
 
-- **80% training data**
+The current notebook uses a **60/20/20 chronological split**:
+
+- **60% training data**
+- **20% validation data**
 - **20% testing data**
-- `random_state=42` for reproducibility
 
-Because `AnimalId` is a multiclass target and the number of records may differ among animals, the final split will use **stratification by `AnimalId` when feasible**. This will help preserve the distribution of animal classes between the training and testing datasets.
+The data are first ordered from the earliest to the latest `EventDate` and then divided sequentially without shuffling.
 
 The planned split is therefore:
 
 ```python
-X_train, X_test, y_train, y_test = train_test_split(
-    X,
-    y,
-    test_size=0.20,
-    random_state=42,
-    stratify=y
+data["EventDate"] = pd.to_datetime(
+    data["EventDate"],
+    errors="coerce"
 )
+
+data = (
+    data.sort_values("EventDate", ascending=True)
+        .reset_index(drop=True)
+)
+
+n = len(data)
+
+train_end = int(n * 0.60)
+validation_end = train_end + int(n * 0.20)
+
+data_train = data.iloc[:train_end].copy()
+data_validation = data.iloc[train_end:validation_end].copy()
+data_test = data.iloc[validation_end:].copy()
 ```
 
-Before using stratification, the number of observations per animal will be checked because classes with too few observations may require separate handling.
+The **training set** contains the earliest 60% of the records and will be used to fit the machine learning models.
 
-A second validation approach may also be considered using `EventDate`. For example, earlier records can be used for training and later records for testing. A time-based holdout would provide a more difficult evaluation of whether an animal-identification model continues to perform well on records collected later in time.
+The **validation set** contains the following 20% of the records and will be used to compare models and tune model parameters during model development.
 
-All preprocessing parameters that are learned from the data will be fitted using the training set only and then applied to the test set. The final unlabelled records will not be used to evaluate or tune the model.
+The **test set** contains the latest 20% of the records and will be kept separate until the final model evaluation.
+
+Using a chronological split helps reduce temporal data leakage. A random split could place observations from similar dates, including temporally adjacent records from the same animals, into both the training and evaluation datasets. This could lead to overly optimistic estimates of model performance.
+
+All preprocessing parameters that are learned from the data will be fitted using the training set only and then applied to the validation and test sets. The final unlabelled records will not be used to evaluate or tune the model.
 
 ---
 
@@ -271,14 +289,16 @@ The planned workflow is:
 3. Separate records with known and missing `AnimalId`.
 4. Clean predictor variables and apply the same plausibility rules to both groups.
 5. Prepare numerical, categorical, and date-based features.
-6. Split the labelled records into training and testing datasets.
-7. Fit preprocessing steps on the training data only.
-8. Train the baseline and candidate classification models.
-9. Compare model performance using the held-out data.
-10. Select the most appropriate model.
-11. Refit the selected modelling pipeline using the available labelled data if appropriate.
-12. Predict `AnimalId` for the retained unlabelled records.
-13. Save the predictions together with enough record information to trace each prediction back to the original data.
+6. Sort the labelled records chronologically by `EventDate`.
+7. Split the labelled records into training, validation, and testing datasets using a 60/20/20 chronological split.
+8. Fit preprocessing steps on the training data only.
+9. Train the baseline and candidate classification models.
+10. Compare model performance using the validation data and tune model parameters.
+11. Select the most appropriate model.
+12. Evaluate the selected model using the held-out test data.
+13. Refit the selected modelling pipeline using the available labelled data if appropriate.
+14. Predict `AnimalId` for the retained unlabelled records.
+15. Save the predictions together with enough record information to trace each prediction back to the original data.
 
 ---
 
@@ -291,8 +311,8 @@ Jupyter Notebook files will follow a numbered workflow so that the analysis can 
 Planned notebook names:
 
 ```text
-01_data_import.ipynb
-02_exploratory_data_analysis.ipynb
+01_Import data set code.ipynb
+02_data_profile.ipynb
 03_data_preprocessing.ipynb
 04_model_training.ipynb
 05_model_evaluation.ipynb
