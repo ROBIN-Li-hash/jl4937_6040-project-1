@@ -41,6 +41,15 @@ MANIFEST
 *.manifest
 *.spec
 
+# .pkl
+*.pkl
+
+# json
+*.json
+
+# joblib
+*.joblib
+
 # Installer logs
 pip-log.txt
 pip-delete-this-directory.txt
