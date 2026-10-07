@@ -3,100 +3,207 @@
 
 ## Project Objective
 
-The objective of this project is to develop and evaluate machine learning models that can predict missing `AnimalId` values in a dairy cow dataset using information from the remaining animal-level and milking-session variables.
+The objective of this project is to develop and evaluate machine-learning methods for recovering missing `AnimalId` values in a large dairy-cow dataset using animal-level, lactation, reproduction, date, and milking-performance information.
 
-The dataset contains repeated milking records and includes variables such as lactation number, days in milk, reproductive status, milk flow, milk yield, milking duration, event date, and milking session. Because `AnimalId` is missing for a substantial subset of records while many production measurements remain available, the project will investigate whether patterns in these features can be used to identify the most likely animal associated with a record.
+The dataset contains repeated milking records for many animals. Because the same cow can appear many times over time, the final modelling workflow is designed as a **time-aware animal-identification problem** rather than a standard random train/test classification task.
 
-This is treated as a **supervised multiclass classification problem**. Records with a known `AnimalId` will be used for model development and evaluation, while records with a missing `AnimalId` will be retained separately for the final prediction step.
-
----
-
-# Project Plan
-
-## 1. Updated Timeline
-
-| Week | Plan |
-| --- | --- |
-| **Week 1** | Explore the dataset, identify duplicated records, quantify missing values, and inspect zero or implausible production values |
-| **Week 2** | Clean the data, remove invalid observations, define plausible biological/production ranges, and prepare labelled and unlabelled datasets |
-| **Week 3** | Encode categorical/date variables, sort the data chronologically by `EventDate`, create the train/validation/test split, establish a baseline model, and train several classification models |
-| **Week 4** | Compare model performance, select the most appropriate model, predict missing `AnimalId` values, organize the code, and finalize the README |
+Records with known `AnimalId` values are used to construct historical reference data, train candidate-ranking models, and evaluate performance. Records with missing `AnimalId` values are retained separately for the final inference stage.
 
 ---
 
-## 2. Development Environment
+# Project Status
 
-The project will be developed **locally** on my personal computer.
+The project has progressed beyond the initial model-comparison plan.
 
-The primary development environment will be:
+The completed workflow now includes:
+
+1. Data profiling and cleaning.
+2. Chronological train/validation/test splitting.
+3. An Extra Trees and KNN benchmark.
+4. Development of a structural candidate-retrieval system.
+5. Candidate-level distance, trajectory, prototype, residual, recency, and ranking features.
+6. A final **Hybrid HistGradientBoostingClassifier (HGB)** reranker.
+7. Outer-validation evaluation.
+8. Frozen final-test evaluation.
+9. Saving the final model, feature order, and model metadata.
+
+The remaining production step is to apply the frozen pipeline to the records with missing `AnimalId`.
+
+---
+
+## 1. Development Environment
+
+The project is developed locally using:
 
 - **IDE:** Visual Studio Code
-- **Programming Language:** Python
-- **Notebook Environment:** Jupyter Notebook in VS Code
-- **Version Control:** Git
-- **Repository Hosting:** GitHub
-- **Main Libraries:** pandas, NumPy, scikit-learn, Matplotlib
+- **Programming language:** Python
+- **Notebook environment:** Jupyter Notebook in VS Code
+- **Version control:** Git
+- **Repository hosting:** GitHub
+- **Main libraries:** pandas, NumPy, scikit-learn, Matplotlib, joblib
 
-The raw dataset will remain stored locally and will not be uploaded to GitHub. It will be excluded from version control using `.gitignore`.
-
-GitHub will be used to track changes in the code, data-cleaning workflow, model development, model evaluation, and project documentation.
+The raw dataset is stored locally and is not intended to be committed to GitHub.
 
 ---
 
-## 3. Dataset Variables and Naming Convention
+## 2. Dataset Variables
 
-The dataset contains dairy cow production and milking information.
+The source data contain dairy-cow production and milking information.
 
 | Variable | Description |
 |---|---|
-| `AnimalId` | Unique identification value for each animal and the prediction target |
+| `AnimalId` | Unique animal identifier and prediction target |
 | `LactationNumber` | Lactation number of the animal |
 | `DaysInMilk` | Number of days since the beginning of the current lactation |
-| `ReproductionStatus` | Reproductive status of the animal, such as Pregnant, Bred, or Open |
+| `ReproductionStatus` | Reproductive status, such as Pregnant, Bred, or Open |
 | `EventDate` | Date associated with the milking record |
 | `Avgmilkflow` | Average milk flow during the milking session |
-| `Flow30_60Session` | Milk flow measured during the 30–60 second period of the milking session |
-| `YieldFirst2Min_Session` | Milk yield during the first two minutes of the milking session |
-| `YieldSession` | Total milk yield during the milking session |
-| `DurationSession_sec` | Duration of the milking session in seconds |
-| `milking` | Milking session/category indicator |
+| `Flow30_60Session` | Milk flow during the 30–60 second period |
+| `YieldFirst2Min_Session` | Milk yield during the first two minutes |
+| `YieldSession` | Total milk yield during the session |
+| `DurationSession_sec` | Milking-session duration in seconds |
+| `milking` | Milking session/category indicator used in the earlier benchmark workflow |
 
-The dataset contains both numerical and categorical variables. Numerical production variables describe the milking performance of each record, while variables such as `ReproductionStatus` and `milking` provide additional categorical information that may help distinguish animals.
+The final Hybrid HGB notebook uses the first ten variables above and does not use `milking` in the retained final feature pipeline.
 
 ---
 
-## 4. Data Cleaning Strategy
+## 3. Name Standardization and Schema Consistency
 
-Data cleaning will be performed before model training so that obvious data-quality problems do not influence the model.
+Consistent naming is important because the modelling notebooks reference columns and saved model features by exact name.
+
+### 3.1 Column-Name Standardization
+
+When the final Hybrid HGB notebook loads the modelling dataset, all column labels are first converted to strings and leading/trailing whitespace is removed:
+
+```python
+data.columns = data.columns.astype(str).str.strip()
+```
+
+A fixed list of required columns is then checked before modelling:
+
+```python
+MODEL_COLUMNS = [
+    "AnimalId",
+    "LactationNumber",
+    "DaysInMilk",
+    "ReproductionStatus",
+    "EventDate",
+    "Avgmilkflow",
+    "Flow30_60Session",
+    "YieldFirst2Min_Session",
+    "YieldSession",
+    "DurationSession_sec",
+]
+```
+
+If a required name is missing, the notebook raises an error instead of continuing with an inconsistent schema.
+
+The project therefore keeps the source-data variable names as the **canonical column names** rather than repeatedly renaming them in different notebooks.
+
+### 3.2 Data-Type Standardization
+
+The final modelling notebook also standardizes important data types:
+
+- `AnimalId` → string
+- `EventDate` → datetime
+- `LactationNumber` → numeric integer
+- `DaysInMilk` → numeric integer
+- `DurationSession_sec` → numeric integer
+- Milk-flow and milk-yield variables → numeric floating point
+- `ReproductionStatus` → categorical
+
+This prevents the same variable from being interpreted differently across training, validation, testing, and prediction data.
+
+### 3.3 Derived-Feature Naming
+
+Engineered features use descriptive names that identify their meaning. Examples include:
+
+- `EventDay`
+- `LactationStartDay`
+- `YieldPerMinute`
+- `First2MinFraction`
+- `FlowShapeRatio`
+- `StartDifference`
+- `RecencyDays`
+- `ClosestDIMDifference`
+- `LocalMinManhattan`
+- `LocalMinEuclidean`
+- `LactationPrototypeManhattan`
+- `CowPrototypeEuclidean`
+- `Residual_Avgmilkflow`
+
+Candidate-level identifier columns are also kept consistent:
+
+- `QueryId`
+- `CandidateClassId`
+- `TrueClassId`
+- `IsCorrectCandidate`
+
+The final model stores the exact feature order in a JSON file so that inference uses the same names and ordering as training.
+
+### 3.4 File-Name Standardization
+
+New project files should use:
+
+- lowercase descriptive names,
+- `snake_case`,
+- no unnecessary spaces,
+- no temporary suffixes such as `(2)` or `(5)` in the repository version,
+- numbered notebook prefixes when order matters.
+
+Recommended repository notebook names are:
+
+```text
+01_import_data.ipynb
+02_data_profile.ipynb
+03_extra_trees_knn_benchmark.ipynb
+04_hybrid_hgb_final.ipynb
+```
+
+Recommended dataset names are:
+
+```text
+dataset_for_model_building.csv
+records_missing_animal_id.csv
+```
+
+The current notebooks still contain some legacy local file names, including the misspelling `buliding`, because those paths were used during model development. If these files are renamed, the corresponding path constants in the notebooks must be updated at the same time.
+
+Saved model artifacts already follow a consistent `snake_case` convention:
+
+```text
+hybrid_hgb_top160_final.joblib
+hybrid_hgb_top160_features.json
+hybrid_hgb_top160_metadata.json
+```
+
+---
+
+## 4. Data Cleaning
 
 ### 4.1 Remove Exact Duplicate Records
 
-The initial data profile identified **60,653 duplicated rows**. These exact duplicates are removed while keeping the first occurrence. After this step, 8,434,768 rows remain and no exact duplicated rows remain.
+The initial data profile identified **60,653 exact duplicate rows**.
 
-Removing duplicated observations prevents identical records from being counted multiple times and reduces the possibility that duplicated data artificially affects model training and evaluation.
+Duplicates were removed while keeping the first occurrence:
 
-### 4.2 Separate Labelled and Unlabelled Records
+- Original duplicated rows removed: **60,653**
+- Rows remaining: **8,434,768**
+- Remaining exact duplicates: **0**
 
-Because the goal is to predict missing `AnimalId` values, records will be separated according to whether the target is available:
+### 4.2 Missing and Zero `Avgmilkflow`
 
-- **Labelled data:** rows with a known `AnimalId`; used for model training and evaluation.
-- **Unlabelled data:** rows with a missing `AnimalId`; retained for the final prediction step.
+The profile identified:
 
-Missing target values will therefore **not** be treated as ordinary rows to delete during the final workflow. Cleaning rules will be applied to predictor variables without removing a row simply because `AnimalId` is missing.
+- **172** missing `Avgmilkflow` values
+- **204** zero `Avgmilkflow` values
 
-This separation is important because the final model must be applied to the records whose `AnimalId` is currently unknown.
+Records with missing or zero `Avgmilkflow` were removed from the modelling data because this variable is a core milking-performance measurement.
 
-### 4.3 Handle Missing and Zero Production Measurements
+### 4.3 Z-Score Outlier Filtering
 
-The current data profile identified 172 missing values in `Avgmilkflow` and 204 zero values before the cleaning steps were completed.
-
-Since average milk flow is a required milking-performance measurement, records with a missing or zero `Avgmilkflow` are removed from the modelling dataset.
-
-Other missing predictor values will be reviewed before modelling. For variables required by a model, the strategy will be either to remove records with unusable predictor information or to apply an appropriate preprocessing/imputation method inside the modelling pipeline.
-
-### 4.4 Statistical Outlier Filtering
-
-A Z-score filter is used for the main continuous milking-performance variables:
+The following continuous variables were screened using an absolute Z-score threshold of 3:
 
 - `Avgmilkflow`
 - `Flow30_60Session`
@@ -104,15 +211,11 @@ A Z-score filter is used for the main continuous milking-performance variables:
 - `YieldSession`
 - `DurationSession_sec`
 
-For each variable, the Z-score is calculated using the mean and standard deviation of the cleaned dataset. A record is flagged as an outlier when at least one of these variables has an absolute Z-score greater than 3.
+This step removed **53,775 rows**, leaving **8,380,617 rows** before the plausibility-range filter.
 
-In the current data profile, this procedure removes **53,775 rows**, leaving 8,380,617 rows before the additional plausibility screening.
+### 4.4 Plausibility-Range Filtering
 
-The Z-score step is intended to remove statistically extreme measurements, but it is not used alone because a statistically unusual value is not automatically biologically impossible.
-
-### 4.5 Plausibility-Range Filtering
-
-After Z-score filtering, predefined conservative ranges are applied to variables where obviously unrealistic values could reduce model quality.
+The following conservative ranges were applied:
 
 | Variable | Accepted Range |
 |---|---:|
@@ -124,197 +227,285 @@ After Z-score filtering, predefined conservative ranges are applied to variables
 | `YieldSession` | 0.5–70.0 kg |
 | `DurationSession_sec` | 60–900 seconds |
 
-The current notebook removes records outside these ranges after the Z-score step. This produces 6,645,172 records in the current threshold-filtered dataset.
+After threshold filtering, the current modelling dataset contains **6,645,172 rows**.
 
-For the final prediction workflow, these predictor-based rules will be applied consistently to both labelled and unlabelled data. The target variable `AnimalId` itself will not be included as a criterion for deleting records that are intended for prediction.
+### 4.5 Missing-`AnimalId` Records
 
-### 4.6 Feature Preparation
+The cleaned model-building export is used for model development.
 
-Before model training, predictors will be converted into a machine-learning-ready format.
-
-Planned preprocessing includes:
-
-- Convert `EventDate` to a proper datetime variable.
-- Sort the data chronologically by `EventDate`.
-- Extract potentially useful date components such as year, month, day, or day of year when appropriate.
-- Encode categorical variables such as `ReproductionStatus` and `milking`.
-- Keep the numerical milking variables as numeric predictors.
-- Ensure the same preprocessing steps are applied to the training, validation, test, and final missing-`AnimalId` datasets.
-- Use a scikit-learn preprocessing pipeline where possible to reduce data leakage and keep preprocessing reproducible.
+The current data-profile notebook also separately extracts rows with missing `AnimalId` from the original source dataset and saves them for the later prediction stage. This keeps the unknown-ID records available even though the cleaned model-building dataset is composed of labelled records.
 
 ---
 
-## 5. Train/Validation/Test Split Strategy
+## 5. Chronological Split Strategy
 
-The cleaned records with a known `AnimalId` will be divided into training, validation, and testing datasets.
+Because each cow contributes repeated records over time, a random split could place highly related observations from the same cow and nearby dates in both training and evaluation sets.
 
-Because the dataset contains repeated milking records collected over time, the records are first sorted chronologically by `EventDate`. The split is performed according to time order rather than randomly in order to reduce the risk of data leakage between earlier and later observations.
+The modelling workflow therefore sorts records chronologically by `EventDate` and uses a **60/20/20 outer split**:
 
-The current notebook uses a **60/20/20 chronological split**:
+- **60% training**
+- **20% validation**
+- **20% test**
 
-- **60% training data**
-- **20% validation data**
-- **20% testing data**
+The benchmark notebook produced:
 
-The data are first ordered from the earliest to the latest `EventDate` and then divided sequentially without shuffling.
+| Split | Rows |
+|---|---:|
+| Training | 3,985,088 |
+| Validation | 1,327,822 |
+| Test | 1,332,262 |
 
-The planned split is therefore:
+The training split contained **7,539 AnimalId classes**.
 
-```python
-data["EventDate"] = pd.to_datetime(
-    data["EventDate"],
-    errors="coerce"
-)
-
-data = (
-    data.sort_values("EventDate", ascending=True)
-        .reset_index(drop=True)
-)
-
-n = len(data)
-
-train_end = int(n * 0.60)
-validation_end = train_end + int(n * 0.20)
-
-data_train = data.iloc[:train_end].copy()
-data_validation = data.iloc[train_end:validation_end].copy()
-data_test = data.iloc[validation_end:].copy()
-```
-
-The **training set** contains the earliest 60% of the records and will be used to fit the machine learning models.
-
-The **validation set** contains the following 20% of the records and will be used to compare models and tune model parameters during model development.
-
-The **test set** contains the latest 20% of the records and will be kept separate until the final model evaluation.
-
-Using a chronological split helps reduce temporal data leakage. A random split could place observations from similar dates, including temporally adjacent records from the same animals, into both the training and evaluation datasets. This could lead to overly optimistic estimates of model performance.
-
-All preprocessing parameters that are learned from the data will be fitted using the training set only and then applied to the validation and test sets. The final unlabelled records will not be used to evaluate or tune the model.
+The final Hybrid HGB notebook also creates an internal chronological split inside the outer training period for historical reference data, reranker training queries, and development queries. This allows model development without using the outer validation or test labels.
 
 ---
 
-## 6. Modelling Strategy
+## 6. Benchmark Models
 
-Since `AnimalId` is a categorical identifier with potentially many unique values, the problem will be approached as **multiclass classification** rather than regression.
+### 6.1 Extra Trees
 
-Several modelling techniques will be compared instead of selecting one model in advance.
+The Extra Trees benchmark was revised after the first version was found to be too constrained for a problem with more than 7,000 animal classes.
 
-### 6.1 Baseline Classifier
-
-A simple baseline classifier will first be created, for example using `DummyClassifier`.
-
-The baseline provides a minimum reference point for model performance. More complex models should perform meaningfully better than this baseline before they are considered useful.
-
-### 6.2 Logistic Regression
-
-Multiclass Logistic Regression will be tested as an interpretable linear baseline after categorical variables are encoded.
-
-Advantages:
-
-- Provides a simple supervised-learning benchmark.
-- Works well with standardized or appropriately encoded predictors.
-- Helps determine whether the relationship between the predictors and animal identity can be captured with a relatively simple decision boundary.
-
-Limitations:
-
-- The dataset is very large and `AnimalId` may contain many classes.
-- Training may become computationally expensive.
-- Linear decision boundaries may not capture complex relationships among milking variables.
-
-For these reasons, Logistic Regression may initially be tested on a manageable training subset.
-
-### 6.3 Decision Tree
-
-A Decision Tree classifier will be used as a nonlinear baseline.
-
-Advantages:
-
-- Can capture nonlinear relationships and interactions.
-- Does not require feature scaling.
-- Provides an interpretable structure for understanding how variables separate records.
-
-The main limitation is that a single tree can overfit, so its test performance will be compared carefully with ensemble methods.
-
-### 6.4 Random Forest
-
-Random Forest is one of the main models planned for this project.
-
-It combines many decision trees and can model nonlinear interactions among variables such as milk yield, milk flow, lactation stage, reproductive status, and milking duration.
-
-Advantages:
-
-- Handles nonlinear relationships.
-- Can model interactions among predictors.
-- Requires relatively little feature scaling.
-- Provides feature-importance information.
-
-Because the dataset contains millions of records, memory use and training time will be considered. Initial model development may use a representative subset of the training data before fitting a larger final model.
-
-### 6.5 Extra Trees
-
-`ExtraTreesClassifier` will also be considered as an ensemble-tree model.
-
-Extra Trees uses additional randomization when constructing trees and can be computationally competitive with Random Forest. Comparing the two models will help determine whether the additional randomization improves generalization for this dataset.
-
-### 6.6 Nearest-Neighbor Approach
-
-A nearest-neighbor method may be explored on a reduced or carefully selected feature set.
-
-The idea is that records from the same cow may have similar patterns in lactation stage, milk yield, milk flow, and milking duration. However, standard K-Nearest Neighbors can be computationally expensive with millions of rows, so it will be treated as an exploratory model rather than the expected final model.
-
-### 6.7 Model Selection
-
-Model selection will be based on performance on data that were not used for model fitting.
-
-Because the target is multiclass, planned evaluation measures include:
-
-- **Accuracy:** proportion of test records assigned the correct `AnimalId`.
-- **Balanced accuracy:** useful if some animals have many more observations than others.
-- **Macro F1-score:** gives each animal class equal importance when summarizing precision and recall.
-- **Weighted F1-score:** summarizes F1 performance while accounting for the number of observations in each class.
-- **Top-k accuracy, if appropriate:** useful for examining whether the true animal is among the model's highest-probability candidates.
-
-A confusion matrix may also be examined for a subset of animals to identify which animals are most frequently confused with one another.
-
-The final model will be selected using test/validation performance together with practical considerations such as computation time, memory requirements, and the ability to generate predictions for the missing-`AnimalId` records.
-
----
-
-## 7. Final Prediction Workflow
-
-The planned workflow is:
-
-1. Load the raw dataset.
-2. Remove exact duplicate rows.
-3. Separate records with known and missing `AnimalId`.
-4. Clean predictor variables and apply the same plausibility rules to both groups.
-5. Prepare numerical, categorical, and date-based features.
-6. Sort the labelled records chronologically by `EventDate`.
-7. Split the labelled records into training, validation, and testing datasets using a 60/20/20 chronological split.
-8. Fit preprocessing steps on the training data only.
-9. Train the baseline and candidate classification models.
-10. Compare model performance using the validation data and tune model parameters.
-11. Select the most appropriate model.
-12. Evaluate the selected model using the held-out test data.
-13. Refit the selected modelling pipeline using the available labelled data if appropriate.
-14. Predict `AnimalId` for the retained unlabelled records.
-15. Save the predictions together with enough record information to trace each prediction back to the original data.
-
----
-
-## 8. File Naming
-
-Project files will use descriptive names without unnecessary spaces.
-
-Jupyter Notebook files will follow a numbered workflow so that the analysis can be read in the correct order.
-
-Planned notebook names:
+The optimized benchmark used class-aware sampling, a more realistic tree search, and the derived lactation-timing feature:
 
 ```text
-01_Import data set code.ipynb
-02_data_profile.ipynb
-03_model_building_16GB_ExtraTrees_KNN_optimized.ipynb
-04_model_building_Hybrid_HGB_final test version.ipynb
+LactationStartDate = EventDate - DaysInMilk
 ```
 
-This structure separates data inspection, preprocessing, model development, evaluation, and final prediction so that the project remains reproducible and easy to follow.
+The best retained Extra Trees validation accuracy was approximately:
+
+**29.23%**
+
+### 6.2 KNN Benchmark
+
+KNN was tested because repeated measurements from the same cow may occupy similar regions of feature space.
+
+Before KNN fitting, numerical and encoded features were standardized using `StandardScaler` because distance-based methods are sensitive to feature scale.
+
+The best KNN validation accuracy was approximately:
+
+**2.86%**
+
+Extra Trees therefore substantially outperformed KNN in the benchmark and motivated a more structured candidate-generation approach rather than a direct nearest-neighbor classifier.
+
+---
+
+## 7. Final Hybrid HGB Pipeline
+
+The final retained system is not a direct 9,000-class classifier. Instead, it is a **candidate retrieval + candidate reranking pipeline**.
+
+### 7.1 Structural Candidate Generation
+
+For each query record, the pipeline builds a historical reference system and retrieves structurally plausible animal candidates.
+
+The retained configuration is:
+
+```text
+Global structural retrieval: Top 320 candidates
+HGB reranker input: Top 160 candidates
+```
+
+Candidate retrieval uses information including:
+
+- lactation number,
+- estimated lactation start timing,
+- historical recency,
+- prior observations of each cow,
+- projected next-lactation profiles when appropriate.
+
+### 7.2 Distance and Prototype Features
+
+The final reference system creates standardized numeric features using `StandardScaler`.
+
+The base numeric measurements are:
+
+- `DaysInMilk`
+- `Avgmilkflow`
+- `Flow30_60Session`
+- `YieldFirst2Min_Session`
+- `YieldSession`
+- `DurationSession_sec`
+
+Additional engineered measurements include:
+
+- `YieldPerMinute`
+- `First2MinFraction`
+- `FlowShapeRatio`
+
+`ReproductionStatus` is one-hot encoded and combined with the standardized numeric measurements.
+
+The pipeline then calculates candidate-level features based on:
+
+- Manhattan distance,
+- Euclidean distance,
+- nearest historical measurements,
+- lactation prototypes,
+- whole-cow prototypes,
+- Days-in-Milk proximity,
+- recency,
+- reproduction-status difference,
+- residual differences,
+- within-query candidate ranks.
+
+### 7.3 Fresh and Long-Gap Snapshot Training
+
+The final HGB is trained using two complementary historical snapshot families.
+
+**Fresh multi-snapshot training** represents short- and medium-horizon prediction conditions.
+
+**Long-gap multi-snapshot training** explicitly covers reference ages from **1 to 160 days**, which was added after temporal drift was observed during validation.
+
+Combining these two training families improves robustness when the historical reference data become older.
+
+### 7.4 Final Reranker
+
+The final reranker is:
+
+```text
+HistGradientBoostingClassifier
+```
+
+with **52 candidate-level features**.
+
+The retained HGB configuration uses:
+
+```python
+learning_rate = 0.05
+max_iter = 400
+max_leaf_nodes = 7
+min_samples_leaf = 10
+l2_regularization = 1.0
+early_stopping = True
+validation_fraction = 0.10
+n_iter_no_change = 20
+random_state = 42
+```
+
+The completed training run contained:
+
+- **3,377 training queries**
+- **539,751 candidate rows**
+- **3,377 positive candidate rows**
+- **52 final features**
+
+---
+
+## 8. Model Evaluation
+
+### 8.1 Outer Validation
+
+The final Hybrid HGB was evaluated on a fixed **2,000-query** outer-validation sample using only the earlier training period as the historical reference.
+
+Results:
+
+| Metric | Result |
+|---|---:|
+| Top-160 candidate coverage | **82.05%** |
+| Overall accuracy | **41.65%** |
+| Seen-`AnimalId` accuracy | **45.17%** |
+| Conditional ranking accuracy | **50.76%** |
+| Correct predictions | **833 / 2,000** |
+
+The validation analysis showed that accuracy decreased as the reference data became older, which motivated the long-gap snapshot training family.
+
+### 8.2 Frozen Final Test
+
+After the modelling protocol was frozen, the final HGB was evaluated on a 2,000-query chronological test sample.
+
+The historical reference for this test ended on **2021-05-20**.
+
+Results:
+
+| Metric | Result |
+|---|---:|
+| `AnimalId` seen in reference | **90.60%** |
+| Top-160 candidate coverage | **78.30%** |
+| Overall test accuracy | **43.55%** |
+| Seen-`AnimalId` test accuracy | **48.07%** |
+| Conditional ranking accuracy | **55.62%** |
+| Correct predictions | **871 / 2,000** |
+
+The final test was run using the frozen model without retraining or additional tuning.
+
+---
+
+## 9. Saved Model Artifacts
+
+The final notebook saves:
+
+```text
+xgboost_cache/
+├── hybrid_hgb_top160_final.joblib
+├── hybrid_hgb_top160_features.json
+└── hybrid_hgb_top160_metadata.json
+```
+
+Although the directory is named `xgboost_cache` for historical compatibility, the retained final model is a scikit-learn `HistGradientBoostingClassifier`, not XGBoost.
+
+The files contain:
+
+- the trained HGB model,
+- the exact 52-feature order required for inference,
+- configuration and validation metadata.
+
+---
+
+## 10. Final Prediction Workflow
+
+The final inference workflow is:
+
+1. Load the records with missing `AnimalId`.
+2. Apply the same column-name and data-type standardization used during model development.
+3. Load the frozen HGB model and saved feature order.
+4. Build the historical reference system using only information available before each query.
+5. Generate the Global Top-320 structural candidate set.
+6. Compute candidate-level distance, prototype, residual, recency, and rank features.
+7. Restrict the candidate set to the Top 160 candidates.
+8. Reindex features to the saved 52-feature order.
+9. Score each candidate with the frozen HGB classifier.
+10. Select the highest-probability candidate for each query.
+11. Save the predicted `AnimalId` together with enough source information to trace each prediction back to the original record.
+
+No retraining or parameter tuning should occur during this final prediction stage.
+
+---
+
+## 11. Repository Workflow
+
+Recommended notebook order:
+
+```text
+01_import_data.ipynb
+02_data_profile.ipynb
+03_extra_trees_knn_benchmark.ipynb
+04_hybrid_hgb_final.ipynb
+```
+
+The workflow is:
+
+```text
+Raw data
+   ↓
+Data profiling
+   ↓
+Duplicate / missing / zero / outlier cleaning
+   ↓
+Clean labelled modelling dataset
+   ↓
+Chronological split
+   ↓
+Extra Trees + KNN benchmark
+   ↓
+Structural candidate retrieval
+   ↓
+Hybrid HGB reranker
+   ↓
+Outer validation
+   ↓
+Frozen final test
+   ↓
+Missing-AnimalId prediction
+```
+
+This structure keeps data preparation, benchmark modelling, final model development, evaluation, and inference separated and reproducible.
