@@ -313,10 +313,8 @@ Planned notebook names:
 ```text
 01_Import data set code.ipynb
 02_data_profile.ipynb
-03_data_preprocessing.ipynb
-04_model_training.ipynb
-05_model_evaluation.ipynb
-06_missing_animalid_prediction.ipynb
+03_model_building_16GB_ExtraTrees_KNN_optimized.ipynb
+04_model_building_Hybrid_HGB_final test version.ipynb
 ```
 
 This structure separates data inspection, preprocessing, model development, evaluation, and final prediction so that the project remains reproducible and easy to follow.
