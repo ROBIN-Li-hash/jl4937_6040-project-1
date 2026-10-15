@@ -15,6 +15,12 @@ __pycache__/
 #DS_Store
 *.DS_Store
 
+# pkl
+*.pkl
+
+# Generated model/candidate cache files
+code/xgboost_cache/*.pkl
+
 # ZIP
 *.zip
 

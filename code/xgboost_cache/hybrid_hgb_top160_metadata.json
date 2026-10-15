@@ -1,0 +1,29 @@
+{
+  "model": "HistGradientBoostingClassifier",
+  "candidate_generation": "Global structural Top-320",
+  "reranker_top_k": 160,
+  "feature_count": 52,
+  "training_design": "Fresh multi-snapshot + long-gap multi-snapshot",
+  "hgb_parameters": {
+    "learning_rate": 0.05,
+    "max_iter": 400,
+    "max_leaf_nodes": 7,
+    "min_samples_leaf": 10,
+    "l2_regularization": 1.0,
+    "early_stopping": true,
+    "validation_fraction": 0.1,
+    "n_iter_no_change": 20,
+    "random_state": 42
+  },
+  "iterations_used": 400,
+  "fresh_top160_training_coverage": 0.8885,
+  "longgap_top160_training_coverage": 0.7995,
+  "outer_validation_queries": 2000,
+  "outer_validation_reference_cutoff": "2020-12-13",
+  "outer_validation_candidate_coverage": 0.822,
+  "outer_validation_overall_accuracy": 0.424,
+  "outer_validation_seen_accuracy": 0.4598698481561822,
+  "outer_validation_conditional_accuracy": 0.5158150851581509,
+  "outer_validation_correct_predictions": 848,
+  "outer_test_used": false
+}
